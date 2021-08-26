@@ -42,7 +42,7 @@ def residuals(x, d, data):
             (a3*(d-mu3)+b3)*(np.heaviside(d-mu3,0)-np.heaviside(d-mu4,0))+\
             (a4*(d-mu4)+b4)*(np.heaviside(d-mu4,0))
     
-    return np.sum((model - data)**2)
+    return np.mean((model - data)**2)
 
 
 def model(x, d):
@@ -158,33 +158,33 @@ def main():
     ax1.set_xlabel('Distance')
     ax1.set_ylabel('Altitude')
     ax1.legend(loc='upper left')
-    count = 10
-    fig_sol.savefig('solution_{count}.png'.format(count=count), dpi=600)
+    plt.show()
+   # count = 11
+   # fig_sol.savefig('solution_{count}.png'.format(count=count), dpi=600)
 
-    fig, ax = plt.subplots()
-    ax.plot(xdata, ydata, 'bo-', label='Radar')
-    line, = ax.plot([], [], 'r', label='Model', lw=2)
-    ax.set_xlabel('Distance')
-    ax.set_ylabel('Altitude')
-   #history = np.loadtxt('iterations.txt') 
-    def init():
-        line.set_data([], [])
-        return line,
-    def animate(i, history, xdata):
-        line.set_data(xdata, model(history[i], xdata))
-        print(i)
-        return line,
-    
-    ax.set_xlim((min(ydata)-10, max(xdata)+10))
-    ax.set_ylim((min(ydata)-10, max(ydata)+10))
+   # fig, ax = plt.subplots()
+   # ax.plot(xdata, ydata, 'bo-', label='Radar')
+   # line, = ax.plot([], [], 'r', label='Model', lw=2)
+   # ax.set_xlabel('Distance')
+   # ax.set_ylabel('Altitude')
+   ##history = np.loadtxt('iterations.txt') 
+   # def init():
+   #     line.set_data([], [])
+   #     return line,
+   # def animate(i, history, xdata):
+   #     line.set_data(xdata, model(history[i], xdata))
+   #     return line,
+   # 
+   # ax.set_xlim((min(ydata)-10, max(xdata)+10))
+   # ax.set_ylim((min(ydata)-10, max(ydata)+10))
 
-    ax.legend(loc='upper left')
-    anim = animation.FuncAnimation(fig, animate, init_func=init, 
-                                   fargs = (history, xdata),
-                                   frames=res.nit, interval=1e3, blit=True,
-                                   repeat=False)
-    anim.save('opt_{count}.mp4'.format(count=count)
-            , fps=1, extra_args=['-vcodec', 'libx264'])
+   # ax.legend(loc='upper left')
+   # anim = animation.FuncAnimation(fig, animate, init_func=init, 
+   #                                fargs = (history, xdata),
+   #                                frames=res.nit, interval=1e3, blit=True,
+   #                                repeat=False)
+   # anim.save('opt_{count}.mp4'.format(count=count)
+   #         , fps=1, extra_args=['-vcodec', 'libx264'])
     
     return res, xdata, ydata, x0, history
 if __name__ == '__main__':
