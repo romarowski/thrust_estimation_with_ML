@@ -47,8 +47,8 @@ def residuals(x, d, altitude, cas):
     alpha = x[20]
     beta = x[21]
     alpha = 1
-    beta =  1
-    mu1=0
+    beta =  1000
+    #mu1=0
     alt_hat =\
             (a1*(d-mu1)+b1)*(np.heaviside(d-mu1,0)-np.heaviside(d-mu2,0))+\
             (a2*(d-mu2)+b2)*(np.heaviside(d-mu2,0)-np.heaviside(d-mu3,0))+\
@@ -90,7 +90,7 @@ def model(x, d):
     beta = x[21]
     alpha = 1
     beta=1
-    mu1=0
+    #mu1=0
     alt_hat = (a1*(d-mu1)+b1)*(np.heaviside(d-mu1,0)-np.heaviside(d-mu2,0))+\
             (a2*(d-mu2)+b2)*(np.heaviside(d-mu2,0)-np.heaviside(d-mu3,0))+\
             (a3*(d-mu3)+b3)*(np.heaviside(d-mu3,0)-np.heaviside(d-mu4,0))+\
@@ -153,16 +153,19 @@ def get_data():
     xdata = xdata[22:70]
     ydata = np.float64(ydata[22:70])
     cas = cas[22:70]
-    
+    cas_o = cas[ydata>0]
+    xdata_o = xdata[ydata>0]
+    ydata_o = ydata[ydata>0]
+        
     # TODO [NORMALIZE DATA]
     #pdb.set_trace()
-    xmax   = np.max(xdata)
-    ymax   = np.max(ydata)
-    casmax = np.max(cas) 
-    xdata /=np.max(xdata)
-    ydata /= np.max(ydata)
-    cas /= np.max(cas)
-    return xdata, ydata, cas, xmax, ymax, casmax
+    xmax   = np.max(xdata_o)
+    ymax   = np.max(ydata_o)
+    casmax = np.max(cas_o) 
+    xdata_o /=np.max(xdata)
+    ydata_o /= np.max(ydata)
+    cas_o /= np.max(cas)
+    return xdata, ydata, cas, xmax, ymax, casmax, cas_o, xdata_o, ydata_o
 
 
 
@@ -192,6 +195,8 @@ def main():
           #   'fun' : lambda x: np.array([x[8]])},
           #  {'type': 'ineq',
           #   'fun' : lambda x: np.array([x[11]])},
+            {'type': 'ineq',
+             'fun': lambda x: np.array(x[:])},
             {'type': 'ineq',
              'fun' : lambda x: np.array([x[4]+eps-x[1]])},
             {'type': 'ineq',
@@ -228,10 +233,10 @@ def main():
    #     8.78525868e+03,  1.60119892e-13,  1.08964453e-01,  2.04519214e+04,
    #     2.15946188e+03,  5.35079596e-02,  2.77729771e+04,  2.95719671e+03])
     #x0 += np.random.randn(12,)
-    xdata, ydata, cas, xmax, ymax, casmax = get_data()
+    xdata, ydata, cas, xmax, ymax, casmax, cas_o, x_o, y_o = get_data()
     history=[np.array(x0)]
     res = minimize(residuals, x0=x0, 
-             args=(xdata, ydata, cas), constraints = cons, 
+             args=(x_o, y_o, cas_o), constraints = cons, 
              callback=store(history))
     #bounds = [(0, .1), (0, .1),   (0, .1),
     #          (0.1, 2), (800, 1200), (0, max(ydata)),
@@ -242,22 +247,22 @@ def main():
    #         constraints = cons) 
     #popt, pcov = curve_fit(func, xdata, ydata)
 
-    alt_hat, cas_hat = model(res.x, xdata)
-    xdata *= xmax
-    ydata *= ymax
-    cas   *= casmax
+    alt_hat, cas_hat = model(res.x, x_o)
+    x_o *= xmax
+    y_o *= ymax
+    cas_o   *= casmax
     alt_hat *= ymax
     cas_hat *= casmax
     fig_sol, ax1 = plt.subplots(2,1)
     ax1[0].plot(xdata, ydata, '-bo', label='Radar')
-    ax1[0].plot(xdata, alt_hat, 'r', lw=2, label='Model')
+    ax1[0].plot(x_o, alt_hat, 'r', lw=2, label='Model')
     ax1[0].vlines(res.x[[1, 4, 7, 10]]*xmax, min(ydata), max(ydata), 
             linestyles='dashed', colors=['k', 'g', 'c', 'm'])
     ax1[0].set_xlabel('Distance')
     ax1[0].set_ylabel('Altitude')
     ax1[0].legend(loc='upper left')
     ax1[1].plot(xdata, cas, '-bo', label='Radar')
-    ax1[1].plot(xdata, cas_hat, 'r', lw=2, label='Model')
+    ax1[1].plot(x_o, cas_hat, 'r', lw=2, label='Model')
     ax1[1].vlines(res.x[[1, 4, 7, 10]]*xmax, np.min(cas), np.max(cas), 
             linestyles='dashed', colors=['k', 'g', 'c', 'm'])
     ax1[1].set_xlabel('Distance')
