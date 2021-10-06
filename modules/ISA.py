@@ -28,6 +28,16 @@ def temperature_ratio_(Alt, Tapt):
 
     return Theta
 
+def temperature_profile(Alt, Tapt):
+    # Tapt [°F], temperature at airport
+    # Alt [ft], aircraft altitude above airport
+    
+    B = 0.003566 #°F/ft atmospheric lapse
+    
+    T = Tapt - B * Alt
+    T = (T - 32) * 5/9 # Conversion to celsius
+    return T
+
 def air_density_ratio(Alt, Tapt, Papt):
     # Tapt [°F], temperature at airport
     # Papt [inHg], pressure at airport 

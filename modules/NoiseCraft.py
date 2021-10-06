@@ -20,7 +20,7 @@ class NoiseCraft:
         self.Approach_steps = pd.read_csv(os.path.join(path, dirs[2]), sep=';')
         self.Departure_steps = pd.read_csv(os.path.join(path, dirs[3]), sep=';')
         self.Default_weights = pd.read_csv(os.path.join(path, dirs[4]), sep=';')
-        self.Jet_engine_coefficents = pd.read_csv(os.path.join(path, dirs[5]),
+        self.Jet_engine_coefficients = pd.read_csv(os.path.join(path, dirs[5]),
                 sep=';')
         self._Meto_loaded = False
         self.Meteo = None
@@ -62,6 +62,7 @@ class NoiseCraft:
             sigma = air_density_ratio(self.Radar[column_names['Altitude']], 
                                       Tapt, Papt) 
             self.Radar['CAS (kts)'] = np.multiply(TAS, np.sqrt(sigma))
+            self.Radar['TAS (kts)'] = TAS
 
     pass
 
