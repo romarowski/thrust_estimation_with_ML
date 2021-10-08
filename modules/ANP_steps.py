@@ -1,5 +1,7 @@
 import numpy as np
 import pdb
+from modules.ISA import pressure_altitude
+
 def sin_of_climb_angle(N, Fn_delta, W_delta, R, Vc, e=0 ):
     #Equation B-12 sin(gamma)
     #K: speed dependent constant
@@ -23,7 +25,7 @@ def first_climb_CAS(C, W):
     #Equation B-15
     return C * np.sqrt(W)
 
-def distance_accelerate(V_T2, V_T1, N, Fn_delta, W_delta, R, e, ROC):
+def distance_accelerate_(V_T2, V_T1, N, Fn_delta, W_delta, R, e, ROC):
     #Equation B-17
 
     f = 0.95 #Factor to account for 8kt headwind
@@ -39,8 +41,26 @@ def distance_accelerate(V_T2, V_T1, N, Fn_delta, W_delta, R, e, ROC):
     s = f * k**2 * (V_T2**2 - V_T1**2) / 2 * (a_max - G * g)
                                             
     return s
+def distance_accelerate(tas_diff, tas_geom_mean, N, Fn_delta, W_delta,\
+        R, ROC, e=0):
+    #Equation B-17
 
-def corrected_net_thrust(df_coeffs, Vc, T, h):
+    f = 0.95 #Factor to account for 8kt headwind
+    g = 32.17 #ft/s Gravity accel 
+    k = 1.688 #ft/s per kt  Convert kt to ft/s
+    e = 0 #Bank angle set to zero for now
+    min2sec = 60 #sec/min
+    # tas_diff = VT2*2 - VT1**2
+    # tas_geom_mean = sqrt((VT2**2 + VT12**2)/2)
+    a_max = g * (N * (Fn_delta / W_delta) - R / np.cos(e))
+    G = ROC / (min2sec * k * tas_geom_mean) #Climb gradient
+
+    s = f * k**2 * (tas_diff) / 2 * (a_max - G * g)
+                                            
+    return s
+
+def corrected_net_thrust(df_coeffs, Vc, T, Alt, Papt):
+    h = pressure_altitude(Alt, Papt)
     E  = df_coeffs['E'].iloc[0]
     F  = df_coeffs['F'].iloc[0]
     Ga = df_coeffs['Ga'].iloc[0]

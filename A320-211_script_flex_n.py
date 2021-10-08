@@ -1,3 +1,4 @@
+import time
 import pandas as pd 
 import numpy as np
 from scipy import optimize, interpolate
@@ -11,13 +12,15 @@ def get_data():
     xdata = flight1['Distance (ft)'].to_numpy()
     ydata = flight1['altitude (ft)'].to_numpy()
     cas = flight1['CAS (kts)'].to_numpy()
+    time = flight1['snapshot'].to_numpy()
+    time = time[43:71]
     xdata = xdata[43:71]
     ydata = np.float64(ydata[43:71])
     cas = cas[43:71]
     cas_o = cas[ydata>0]
     xdata_o = xdata[ydata>0]
     ydata_o = ydata[ydata>0]
-    return xdata, ydata, cas, cas_o, xdata_o, ydata_o
+    return xdata, ydata, cas, cas_o, xdata_o, ydata_o, time
 
 def segments_fit(X, Y, cas, maxcount):
     xmin = X.min()
@@ -139,8 +142,12 @@ def moving_mean(vector):
     return (vector[:-1] + vector[1:]) / 2
 
 
-X, Y, CAS, cas_o, x_o, y_o = get_data()
+X, Y, CAS, cas_o, x_o, y_o, times = get_data()
+times -= times[0]
+t = time.time()
 vals, res = segments_fit(x_o, y_o, cas_o, 6)
+elapsed = time.time() - t
+print(elapsed)
 noisecraft = NoiseCraft.NoiseCraft('A320-211')
 steps, sins_gamma, first_CAS = procedural_steps_takeoff(vals, noisecraft)
 params = {'sins_gamma' : sins_gamma,
@@ -155,10 +162,17 @@ x0 = [Fn0, weight0]
 residual_first_climb = optimize.minimize(climb_at_ct_speed, x0, 
         args=(params, noisecraft))
 px, py, pcas = vals
-plt.subplot(211)
+ptimes = np.interp(px, X, times)
+plt.subplot(221)
 plt.plot(X, Y, '.')
 plt.plot(px, py, '-or')
-plt.subplot(212)
+plt.subplot(223)
 plt.plot(X, CAS, '.')
 plt.plot(px, pcas, '-or')
+plt.subplot(222)
+plt.plot(times, Y, '.')
+plt.plot(ptimes, py, '-or')
+plt.subplot(224)
+plt.plot(times, CAS, '.')
+plt.plot(ptimes, pcas, '-or')
 plt.show()

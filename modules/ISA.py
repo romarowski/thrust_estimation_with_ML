@@ -38,6 +38,16 @@ def temperature_profile(Alt, Tapt):
     T = (T - 32) * 5/9 # Conversion to celsius
     return T
 
+def pressure_altitude(Alt, Papt):
+    delta = pressure_ratio_(Alt, Papt)
+    g = 32.17 #ft/s^2 gravity
+    B = 0.003566 #°F/ft atmospheric lapse
+    R = 1716.59 #ft*lb/(sl*°R)
+    T0 = 518.67 #°R temperature at std mean sea level
+    gBR = np.round(g/B/R, 4)
+
+    h = T0 / B * (1 - delta ** (1 / gBR))
+    return h
 def air_density_ratio(Alt, Tapt, Papt):
     # Tapt [°F], temperature at airport
     # Papt [inHg], pressure at airport 
