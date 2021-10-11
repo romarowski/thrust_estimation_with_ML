@@ -4,6 +4,7 @@ import pdb
 import numpy as np
 from modules.ISA import air_density_ratio
 from modules import inm_map_projection
+from scipy import interpolate
 class NoiseCraft:
     
     def __init__(self, ACFT_ID):
@@ -80,3 +81,24 @@ class NoiseCraft:
     
     #def calculate_distance(self):
         #TODO
+
+    def interpolate_TO_distance(self, dist, alt, cas, steps):
+        f = interpolate.interp1d(alt[:2], dist[:2], fill_value = 'extrapolate')
+        steps_ = np.copy(steps)
+        steps_ = np.r_[['TakeOff'], steps_]
+        dist_ = np.copy(dist)
+        alt_  = np.copy(alt)
+        cas_  = np.copy(cas)
+        dist_[0] = f(0)
+        alt_[0] = 0.
+        dist_ = np.r_[0., dist_]
+        alt_ = np.r_[0., alt_]
+        cas_ = np.r_[0, cas_]
+
+        return dist_, alt_, cas_, steps_
+
+    #def segment_time(self, dist, dist_full, times):
+    #    ptimes = np.interp(dist, dist_full, times)
+    #    return ptimes 
+
+
