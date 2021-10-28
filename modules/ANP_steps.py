@@ -30,7 +30,7 @@ def distance_accelerate_(V_T2, V_T1, N, Fn_delta, W_delta, R, e, ROC):
 
     f = 0.95 #Factor to account for 8kt headwind
     g = 32.17 #ft/s Gravity accel 
-    k = 1.688 #ft/s per kt  Convert kt to ft/s
+    k = 1.68781 #ft/s per kt  Convert kt to ft/s
     e = 0 #Bank angle set to zero for now
     min2sec = 60 #sec/min
     V_T = (V_T2 + V_T1) / 2
@@ -48,7 +48,7 @@ def distance_accelerate(tas_diff, tas_geom_mean, N, Fn_delta, W_delta,\
 
     f = 0.95 #Factor to account for 8kt headwind
     g = 32.17 #ft/s Gravity accel 
-    k = 1.688 #ft/s per kt  Convert kt to ft/s
+    k = 1.68781 #ft/s per kt  Convert kt to ft/s
     e = 0 #Bank angle set to zero for now
     min2sec = 60 #sec/min
     # tas_diff = VT2*2 - VT1**2
@@ -103,7 +103,7 @@ def distance_accel_pinv(tas_diff, tas_geom_mean, N, S_seg, \
 
     f = 0.95 #Factor to account for 8kt headwind
     g = 32.17 #ft/s Gravity accel 
-    k = 1.688 #ft/s per kt  Convert kt to ft/s
+    k = 1.68781 #ft/s per kt  Convert kt to ft/s
     e = 0 #Bank angle set to zero for now
     min2sec = 60 #sec/min
     # tas_diff = VT2*2 - VT1**2

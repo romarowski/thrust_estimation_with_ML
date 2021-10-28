@@ -92,7 +92,7 @@ def main():
 
 
 
-    craft.new_vert_profile(column_names)
+    #craft.new_vert_profile(column_names)
     craft.new_vert_profile_pinv(column_names)
     
     if plot_:

@@ -1115,18 +1115,17 @@ class NoiseCraft:
                         tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
                     
         
-            sins_gamma_est = sins_gamma_estimation(dist, alt, cas)
-            
-            
-            sins_gamma_est_o =sins_gamma_est[steps=='Climb']            
-            seg_accel_o = segment_accel[steps=='Accelerate']
+            #sins_gamma_radar = sins_gamma_estimation(dist, alt, cas)
+            #
+            #sins_gamma_radar_o = sins_gamma_est[steps=='Climb']            
+            #seg_accel_o = segment_accel[steps=='Accelerate']
 
-            return sins_gamma_est, segment_accel, est_first_climb_CAS, est_TO8,\
+            return sins_gamma, segment_accel, est_first_climb_CAS, est_TO8,\
                     cas
 
-        sins, accels, first_cas, to8, cas = model([self.weight_GA, self.Tflex_GA])
-        sins_g, accels_g, first_cas_g, to8_g, cas_g =\
-                model([self.weight_grad, self.Tflex_grad])
+        #sins, accels, first_cas, to8, cas = model([self.weight_GA, self.Tflex_GA])
+        #sins_g, accels_g, first_cas_g, to8_g, cas_g =\
+        #        model([self.weight_grad, self.Tflex_grad])
         
         sins_p, accels_p, first_cas_p, to8_p, cas_p =\
                 model([self.weight_pinv, self.Tflex_pinv])
@@ -1140,26 +1139,29 @@ class NoiseCraft:
         
 
 
-        for i, step in enumerate(self.steps):
-            if step == 'TakeOff':
-                d_anp = np.r_[0, to8]
-                h_anp = np.r_[0, 0]
-                cas_anp = np.r_[0, first_cas]
-            elif step == 'Climb':
-                h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
-                d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
-                        /np.tan(np.arcsin(sins[i])))]
-                cas_anp = np.r_[cas_anp, cas_anp[-1]]
-            elif step == 'Accelerate':
-                h_anp   = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
-                d_anp   = np.r_[d_anp, d_anp[-1] + accels[i]]
-                cas_anp = np.r_[cas_anp, cas_anp[-1] + np.diff(cas)[i]]
+        #for i, step in enumerate(self.steps):
+        #    if step == 'TakeOff':
+        #        #d_anp = np.r_[0, to8]
+        #        #h_anp = np.r_[0, 0]
+        #        #cas_anp = np.r_[0, first_cas]
+        #        d_anp = np.array([self.d_seg[1]])
+        #        h_anp = np.array([0])
+        #        cas_anp = np.array([first_cas])
+        #    elif step == 'Climb':
+        #        h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+        #        d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
+        #                /np.tan(np.arcsin(sins[i])))]
+        #        cas_anp = np.r_[cas_anp, cas_anp[-1]]
+        #    elif step == 'Accelerate':
+        #        h_anp   = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+        #        d_anp   = np.r_[d_anp, d_anp[-1] + accels[i]]
+        #        cas_anp = np.r_[cas_anp, cas_anp[-1] + np.diff(cas)[i]]
         
         
-        self.d_anp = np.copy(d_anp)
-        self.h_anp = np.copy(h_anp)
-        self.cas_anp = np.copy(cas_anp)
-        
+        #self.d_anp = np.copy(d_anp)
+        #self.h_anp = np.copy(h_anp)
+        #self.cas_anp = np.copy(cas_anp)
+        #
         d_anp = []
         h_anp = []
         cas_anp = []
@@ -1167,7 +1169,10 @@ class NoiseCraft:
             if step == 'TakeOff':
                 d_anp = np.r_[0, to8_p]
                 h_anp = np.r_[0, 0]
-                cas_anp = np.r_[0, first_cas_p]
+                cas_anp = np.r_[0, first_cas_p[0]]
+                #d_anp = np.array([self.d_seg[1]])
+                #h_anp = np.array([0])
+                #cas_anp = np.array([first_cas_p[0]])
             elif step == 'Climb':
                 h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
                 d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
@@ -1185,47 +1190,75 @@ class NoiseCraft:
         d_anp = []
         h_anp = []
         cas_anp = []
-        
         for i, step in enumerate(self.steps):
             if step == 'TakeOff':
-                d_anp = np.r_[0, to8_n]
-                h_anp = np.r_[0, 0]
-                cas_anp = np.r_[0, first_cas_n]
+                #d_anp = np.r_[0, to8_p]
+                #h_anp = np.r_[0, 0]
+                #cas_anp = np.r_[0, first_cas_p]
+                d_anp = np.array([self.d_seg[1]])
+                h_anp = np.array([0])
+                cas_anp = np.array([first_cas_p[0]])
             elif step == 'Climb':
-                h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+                h_anp = np.r_[h_anp, (self.h_seg)[i+1]]
                 d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
-                        /np.tan(np.arcsin(sins_n[i])))]
+                        /np.tan(np.arcsin(sins_p[i])))]
                 cas_anp = np.r_[cas_anp, cas_anp[-1]]
             elif step == 'Accelerate':
-                h_anp   = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
-                d_anp   = np.r_[d_anp, d_anp[-1] + accels_n[i]]
-                cas_anp = np.r_[cas_anp, cas_anp[-1] + np.diff(cas_p)[i]]
+                h_anp   = np.r_[h_anp, (self.h_seg)[i+1]]
+                d_anp   = np.r_[d_anp, d_anp[-1] + accels_p[i]]
+                cas_anp = np.r_[cas_anp, (self.cas_seg)[i+1]]
         
-        self.d_anp_n = np.copy(d_anp)
-        self.h_anp_n = np.copy(h_anp)
-        self.cas_anp_n = np.copy(cas_anp)
+        self.d_anp_p_no_TO = np.copy(d_anp)
+        self.h_anp_p_no_TO = np.copy(h_anp)
+        self.cas_anp_p_no_TO = np.copy(cas_anp)
         
-        d_anp = []
-        h_anp = []
-        cas_anp = []
-        for i, step in enumerate(self.steps):
-            if step == 'TakeOff':
-                d_anp = np.r_[0, to8_g]
-                h_anp = np.r_[0, 0]
-                cas_anp = np.r_[0, first_cas_g]
-            elif step == 'Climb':
-                h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
-                d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
-                        /np.tan(np.arcsin(sins_g[i])))]
-                cas_anp = np.r_[cas_anp, cas_anp[-1]]
-            elif step == 'Accelerate':
-                h_anp   = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
-                d_anp   = np.r_[d_anp, d_anp[-1] + accels_g[i]]
-                cas_anp = np.r_[cas_anp, cas_anp[-1] + np.diff(cas_p)[i]]
+        #d_anp = []
+        #h_anp = []
+        #cas_anp = []
+        #
+        #for i, step in enumerate(self.steps):
+        #    if step == 'TakeOff':
+        #        #d_anp = np.r_[0, to8_n]
+        #        #h_anp = np.r_[0, 0]
+        #        #cas_anp = np.r_[0, first_cas_n]
+        #        d_anp = np.array([self.d_seg[1]])
+        #        h_anp = np.array([0])
+        #        cas_anp = np.array([first_cas])
+        #    elif step == 'Climb':
+        #        h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+        #        d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
+        #                /np.tan(np.arcsin(sins_n[i])))]
+        #        cas_anp = np.r_[cas_anp, cas_anp[-1]]
+        #    elif step == 'Accelerate':
+        #        h_anp   = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+        #        d_anp   = np.r_[d_anp, d_anp[-1] + accels_n[i]]
+        #        cas_anp = np.r_[cas_anp, cas_anp[-1] + np.diff(cas_p)[i]]
+        #
+        #self.d_anp_n = np.copy(d_anp)
+        #self.h_anp_n = np.copy(h_anp)
+        #self.cas_anp_n = np.copy(cas_anp)
         
-        self.d_anp_g = np.copy(d_anp)
-        self.h_anp_g = np.copy(h_anp)
-        self.cas_anp_g = np.copy(cas_anp)
+        #d_anp = []
+        #h_anp = []
+        #cas_anp = []
+        #for i, step in enumerate(self.steps):
+        #    if step == 'TakeOff':
+        #        d_anp = np.r_[0, to8_g]
+        #        h_anp = np.r_[0, 0]
+        #        cas_anp = np.r_[0, first_cas_g]
+        #    elif step == 'Climb':
+        #        h_anp = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+        #        d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
+        #                /np.tan(np.arcsin(sins_g[i])))]
+        #        cas_anp = np.r_[cas_anp, cas_anp[-1]]
+        #    elif step == 'Accelerate':
+        #        h_anp   = np.r_[h_anp, h_anp[-1] + np.diff(self.h_seg)[i]]
+        #        d_anp   = np.r_[d_anp, d_anp[-1] + accels_g[i]]
+        #        cas_anp = np.r_[cas_anp, cas_anp[-1] + np.diff(cas_p)[i]]
+        #
+        #self.d_anp_g = np.copy(d_anp)
+        #self.h_anp_g = np.copy(h_anp)
+        #self.cas_anp_g = np.copy(cas_anp)
         
         def plot_anp():
             px = self.d_seg
@@ -1237,20 +1270,22 @@ class NoiseCraft:
             
             plt.subplot(211)
             plt.plot(X, Y, '.', label='Radar')
-            #plt.plot(px, py, '-or', label='Model')
-            plt.plot(self.d_anp, self.h_anp, '-og', label='GA')
+            plt.plot(px, py, '-or', label='Seg')
+            #plt.plot(self.d_anp, self.h_anp, '-og', label='GA')
             plt.plot(self.d_anp_p, self.h_anp_p, '-oy', label='pinv')
-            plt.plot(self.d_anp_g, self.h_anp_g, '-om', label='grad')
+            plt.plot(self.d_anp_p_no_TO, self.h_anp_p_no_TO, '-ok', label='pinv')
+            #plt.plot(self.d_anp_g, self.h_anp_g, '-om', label='grad')
             plt.xlabel('Dist [ft]')
             plt.ylabel('Alt [ft]')
             plt.legend()
             
             plt.subplot(212)
             plt.plot(X, CAS, '.', label='Radar')
-            #plt.plot(px, pcas, '-or', label='Model')
-            plt.plot(self.d_anp, self.cas_anp, '-og', label='GA')
+            plt.plot(px, pcas, '-or', label='Seg')
+            #plt.plot(self.d_anp, self.cas_anp, '-og', label='GA')
             plt.plot(self.d_anp_p, self.cas_anp_p, '-oy', label='pinv')
-            plt.plot(self.d_anp_g, self.cas_anp_g, '-om', label='grad')
+            plt.plot(self.d_anp_p_no_TO, self.cas_anp_p_no_TO, '-ok', label='pinv')
+            #plt.plot(self.d_anp_g, self.cas_anp_g, '-om', label='grad')
             plt.xlabel('Dist [ft]')
             plt.ylabel('CAS [kts]')
             #plt.legend()
