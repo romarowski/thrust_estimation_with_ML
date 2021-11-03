@@ -14,8 +14,17 @@ def main():
     bank_angle = 0*np.pi/180
 
     sin_gamma = K * (N * Fn / W - R / np.cos(bank_angle))
-    print(sin_gamma)
+    plt.subplot(211)
     plt.plot(R, sin_gamma, 'o')
+    plt.xlabel('R')
+    plt.ylabel('sin$\gamma$')
+
+    dists = 1000 / np.tan(np.arcsin(sin_gamma))
+    
+    plt.subplot(212)
+    plt.plot(R, dists, 'o')
+    plt.xlabel('R')
+    plt.ylabel('distances')
     plt.show()
     
     return 0 

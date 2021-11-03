@@ -19,8 +19,8 @@ def main():
     
    #folder = 'ORY_to_BIA'
     
-   # folder = 'AMS_TNG'
-   # flight_id = '520831277'
+    #folder = 'AMS_TNG'
+    #flight_id = '520831277'
     
     meteo_fn = 'meteo.csv'
     
@@ -92,8 +92,8 @@ def main():
 
 
 
-    #craft.new_vert_profile(column_names)
-    craft.new_vert_profile_pinv(column_names)
+    craft.new_vert_profile(column_names)
+    #craft.new_vert_profile_pinv(column_names)
     
     if plot_:
         craft.plot_segmented()
