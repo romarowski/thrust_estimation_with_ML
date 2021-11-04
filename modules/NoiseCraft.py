@@ -394,262 +394,259 @@ class NoiseCraft:
         self.time_seg    = time_
         
         pass
-        global _loss 
-        def _loss(x, self, column_names, model=False, op_type = 'D'):
-            weight = x[0]
-            Tflex  = x[1]
+    def _loss(self, x, column_names, thrust_cfg, model=False, op_type = 'D'):
+        weight = x[0]
+        Tflex  = x[1]
 
-            #weight = 127496.7607
+        #weight = 127496.7607
 
-            dist   = self.d_seg
-            alt    = self.h_seg
-            cas    = self.cas_seg
-            times  = self.time_seg
-            steps = self.steps
-            #print('Laying down new profile...')
-            
-            def mid_values(vec):
-                return (vec[1:] + vec[:-1]) / 2
-            def sins_gamma_estimation(dist, alt, cas):
-                climbs_deltaH = np.diff(alt)
-                climbs_deltaS = np.diff(dist)
-                sins_gamma = climbs_deltaH /\
-                        np.sqrt(climbs_deltaH**2 + climbs_deltaS**2)
-                return sins_gamma
-            
-            Tapt = self.Meteo[column_names['Temperature']].iloc[0]
-            Papt = self.Meteo[column_names['Pressure']].iloc[0]
-
-            Tflex = (Tflex * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
-
-            
-            Aero_coeff = self.Aerodynamic_coefficients
-            dep_Aero_coeff = Aero_coeff[Aero_coeff["Op Type"] == op_type]
-            Tapt = (Tapt * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
-            Papt = Papt / 33.864 #Conversion mbar to inHg (not ideal)
-            
-
-            sigmas       = air_density_ratio(alt, Tapt, Papt)
-            tas          = np.multiply(cas, np.reciprocal(np.sqrt(sigmas)))
-            mean_sigmas  = mid_values(sigmas)
-            mean_sigmas_ = air_density_ratio(mid_values(alt), Tapt, Papt)
-
-            tas_geom_mean = np.sqrt(mid_values(np.power(tas, 2))) #Impact eq-17
-            tas_diff      = np.diff(np.power(tas, 2))
-            deltas        = pressure_ratio_(alt, Papt)
-            mean_deltas   = mid_values(deltas)
-            #print(deltas)
-            W_delta       = weight * np.reciprocal(mean_deltas)
-
-            
-            
-            first_climb = True
-            first_accel = True
-
-
-            #Obtain flaps by type of step: Accel, TO, Climb for now
-            dep_steps = self.Departure_steps[['Step Number', 'Step Type',
-                'Thrust Rating', 'Flap_ID']]
-            climb_Flap_ID = dep_steps[dep_steps['Step Type']==\
-                    'Climb']['Flap_ID'].unique()
-            TO_Flap_ID = dep_steps[dep_steps['Step Type']==\
-                    'Takeoff']['Flap_ID'].unique() #climb_Flap_ID[0] 
-            accel_Flap_ID = dep_steps[dep_steps['Step Type']==\
-                    'Accelerate']['Flap_ID'].unique()
-
-            N = self.Aircraft['Number Of Engines'].iloc[0]
-
-            Jet_eng_coeff = self.Jet_engine_coefficients
-            thrust_rating = {'Reg'   : {'C': 'MaxClimb', 'TO' : 'MaxTakeoff'},
-                             'HiTemp': {'C': 'MaxClimbHiTemp', 'TO' : 'MaxTkoffHiTemp'}
-                             }
-            thrust_type = 'HiTemp'
-
-            
-            if thrust_type == 'HiTemp':
-                midpoint_Temps = temperature_profile(mid_values(alt), Tflex)
-            else:
-                midpoint_Temps = temperature_profile(mid_values(alt), Tapt)
-
-            sins_gamma = np.zeros(np.shape(steps))
-            segment_accel = np.zeros(np.shape(steps))
-            ROCs = np.multiply(np.diff(alt), np.reciprocal(np.diff(times))) * 60.
-            self.ROCs = ROCs #ft/min
-
-            for i, step in enumerate(steps):
-                if step == 'TakeOff':
-                    
-
-                    B8 = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                            TO_Flap_ID[0]]['B'].iloc[0]
-                    theta = temperature_ratio_(Alt=0, Tapt=Tapt)
-                    
-                    W_delta_TO = weight / pressure_ratio_(Alt=0, Papt=Papt)
-                    
-                    thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-                            thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-                    
-                    if thrust_type == 'HiTemp':
-                        T_thrust = Tflex
-                    else:
-                        T_thrust = Tapt
-
-                    #Should be CAS of first point
-                    Fn_delta = corrected_net_thrust(thrust_coeff,(cas)[i+1],
-                        temperature_profile(Alt=0, Tapt=T_thrust), Alt=0, Papt=Papt)
-                    est_TO8 = TO_ground_roll_distance(B8, theta, W_delta_TO, N, 
-                            Fn_delta)
-                
-                elif step == 'Climb' and first_climb:
-                    R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                            TO_Flap_ID[0]]['R'].iloc[0]
-
-                    thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-                            thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-
-                    Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-                            midpoint_Temps[i], mid_values(alt)[i], Papt)
-                    #print(Fn_delta)
-                    sins_gamma[i] = sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
-                            mid_values(cas)[i])
-
-                    #FIRST CAS
-
-                    C = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                            TO_Flap_ID[0]]['C'].iloc[0]
-
-                    est_first_climb_CAS = first_climb_CAS(C, weight)
-                    #TODO receck this following line!
-                    radar_first_CAS = mid_values(cas)[i]
-
-
-                    first_climb = False
-
-
-                elif step == 'Climb' and first_climb==False:
-                    
-                    R  = x[i]
-                    #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                    #        climb_Flap_ID[1]]['R'].iloc[0]
-                    thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-                            thrust_rating[thrust_type]['C']].reset_index(drop=True)
-
-                    Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-                            midpoint_Temps[i], mid_values(alt)[i], Papt)
-
-                    sins_gamma[i] = sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
-                            mid_values(cas)[i])
-                elif step == 'Accelerate' and first_accel:
-                    
-                    R  = x[i]
-
-                    #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                    #        accel_Flap_ID[0]]['R'].iloc[0]
-
-                    thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-                        thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-
-                    Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-                        midpoint_Temps[i], mid_values(alt)[i], Papt)
-                    segment_accel[i] = distance_accelerate(tas_diff[i],
-                        tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
-
-                    first_accel = False
-                    second_accel = True
-                elif step == 'Accelerate' and first_accel == False and \
-                        second_accel==True:
-
-                    R  = x[i]
-                    #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                    #        accel_Flap_ID[1]]['R'].iloc[0]
-
-                    thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-                        thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-
-                    Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-                        midpoint_Temps[i], mid_values(alt)[i], Papt)
-                    segment_accel[i] = distance_accelerate(tas_diff[i],
-                        tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
-                 
-                    second_accel = False
-                elif step == 'Accelerate' and first_accel == False and \
-                        second_accel==False:
-
-                    R  = x[i]
-                    #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-                    #        accel_Flap_ID[2]]['R'].iloc[0]
-
-                    thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-                        thrust_rating[thrust_type]['C']].reset_index(drop=True)
-
-                    Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-                        midpoint_Temps[i], mid_values(alt)[i], Papt)
-                    segment_accel[i] = distance_accelerate(tas_diff[i],
-                        tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
-                    
+        dist   = self.d_seg
+        alt    = self.h_seg
+        cas    = self.cas_seg
+        times  = self.time_seg
+        steps = self.steps
+        #print('Laying down new profile...')
         
-            sins_gamma_est = sins_gamma_estimation(dist, alt, cas)
-            
-            
-            #sins_gamma_o = (sins_gamma - min(sins_gamma[steps=='Climb']))/\
-            #        (max(sins_gamma[steps=='Climb'])-min(sins_gamma[steps=='Climb']))
-            #sins_gamma_est_o = (sins_gamma_est - min(sins_gamma_est[steps=='Climb']))/\
-            #        (max(sins_gamma_est[steps=='Climb'])-min(sins_gamma_est[steps=='Climb']))
-            #
-            #seg_accel_o = (segment_accel[steps=='Accelerate']- \
-            #        min(segment_accel[steps=='Accelerate'])) / \
-            #        (max(segment_accel[steps=='Accelerate']) - \
-            #        min(segment_accel[steps=='Accelerate']))
-            #seg_accel_RADAR_o = (np.diff(dist)[steps=='Accelerate'] - \
-            #        min(np.diff(dist)[steps=='Accelerate']))        / \
-            #        (max(np.diff(dist)[steps=='Accelerate'])        - \
-            #        min(np.diff(dist)[steps=='Accelerate']))
+        def mid_values(vec):
+            return (vec[1:] + vec[:-1]) / 2
+        def sins_gamma_estimation(dist, alt, cas):
+            climbs_deltaH = np.diff(alt)
+            climbs_deltaS = np.diff(dist)
+            sins_gamma = climbs_deltaH /\
+                    np.sqrt(climbs_deltaH**2 + climbs_deltaS**2)
+            return sins_gamma
+        
+        Tapt = self.Meteo[column_names['Temperature']].iloc[0]
+        Papt = self.Meteo[column_names['Pressure']].iloc[0]
 
-            sins_gamma_o = sins_gamma[steps=='Climb']
-            sins_gamma_est_o =sins_gamma_est[steps=='Climb']            
-            seg_accel_o = segment_accel[steps=='Accelerate']
-            seg_accel_RADAR_o = np.diff(dist)[steps=='Accelerate']
-           
-            
-            #cost_climb = (sins_gamma_o-sins_gamma_est_o)**2
+        Tflex = (Tflex * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
 
-            #cost_climb = cost_climb / max(cost_climb)
-            #        
-            #cost_climb = np.sum(cost_climb)
-            #cost_accel = (seg_accel_RADAR_o - seg_accel_o)**2
+        
+        Aero_coeff = self.Aerodynamic_coefficients
+        dep_Aero_coeff = Aero_coeff[Aero_coeff["Op Type"] == op_type]
+        Tapt = (Tapt * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
+        Papt = Papt / 33.864 #Conversion mbar to inHg (not ideal)
+        
 
-            #cost_accel = cost_accel / max(cost_accel) 
-            #cost_accel = np.sum(cost_accel)
+        sigmas       = air_density_ratio(alt, Tapt, Papt)
+        tas          = np.multiply(cas, np.reciprocal(np.sqrt(sigmas)))
+        mean_sigmas  = mid_values(sigmas)
+        mean_sigmas_ = air_density_ratio(mid_values(alt), Tapt, Papt)
 
-            cost_climb = np.mean((sins_gamma[steps=='Climb'] - \
-                   sins_gamma_est[steps=='Climb'])**2)
-            
-            cost_accel = np.mean((segment_accel[steps=='Accelerate'] - \
-                   np.diff(dist)[steps=='Accelerate'])**2)
-            
-            cost_first_CAS = (est_first_climb_CAS - radar_first_CAS)**2
+        tas_geom_mean = np.sqrt(mid_values(np.power(tas, 2))) #Impact eq-17
+        tas_diff      = np.diff(np.power(tas, 2))
+        deltas        = pressure_ratio_(alt, Papt)
+        mean_deltas   = mid_values(deltas)
+        #print(deltas)
+        W_delta       = weight * np.reciprocal(mean_deltas)
 
-            cost_TO8 = (est_TO8 - np.diff(dist)[steps=='TakeOff'])**2
-            
-            #cost = cost_climb + cost_accel + 2*cost_first_CAS/200 + cost_TO8[0]/1e8
-            cost = cost_first_CAS * cost_climb *  cost_accel **2
-            
-            #cost = cost_accel
+        
+        
+        first_climb = True
+        first_accel = True
 
 
-            #print('ANP climb angle: '  + str(sins_gamma[steps=='Climb']))
-            #print('RADAR climb angle ' +  str(sins_gamma_est[steps=='Climb']))
-            #print('ANP accel segment '+ str(segment_accel[steps=='Accelerate']))
-            #print('RADAR accel segment ' + str(np.diff(dist)[steps=='Accelerate']))
-            #print('ANP first CAS ' + str(est_first_climb_CAS))
-            #print('RADAR first CAS ' + str(radar_first_CAS))
-            #print('ANP TO8 ' + str(est_TO8))
-            #print('RADAR TO8 ' + str(np.diff(dist)[0]))
-            if not model:
-                return cost
-            else:
-                return sins_gamma, segment_accel, est_first_climb_CAS, est_TO8,\
-                    cas
+        #Obtain flaps by type of step: Accel, TO, Climb for now
+        dep_steps = self.Departure_steps[['Step Number', 'Step Type',
+            'Thrust Rating', 'Flap_ID']]
+        climb_Flap_ID = dep_steps[dep_steps['Step Type']==\
+                'Climb']['Flap_ID'].unique()
+        TO_Flap_ID = dep_steps[dep_steps['Step Type']==\
+                'Takeoff']['Flap_ID'].unique() #climb_Flap_ID[0] 
+        accel_Flap_ID = dep_steps[dep_steps['Step Type']==\
+                'Accelerate']['Flap_ID'].unique()
+
+        N = self.Aircraft['Number Of Engines'].iloc[0]
+
+        Jet_eng_coeff = self.Jet_engine_coefficients
+        thrust_rating = {'Reg'   : {'C': 'MaxClimb', 'TO' : 'MaxTakeoff'},
+                         'HiTemp': {'C': 'MaxClimbHiTemp', 'TO' : 'MaxTkoffHiTemp'}
+                         }
+        thrust_type = 'HiTemp'
+
+        
+        if thrust_type == 'HiTemp':
+            midpoint_Temps = temperature_profile(mid_values(alt), Tflex)
+        else:
+            midpoint_Temps = temperature_profile(mid_values(alt), Tapt)
+
+        n_steps = len(steps)
+        
+        sins_gamma = np.zeros(n_steps)
+        segment_accel = np.zeros(n_steps)
+        
+        ROCs = np.multiply(np.diff(alt), np.reciprocal(np.diff(times))) * 60.
+        self.ROCs = ROCs #ft/min
+
+        
+
+        for i, step in enumerate(steps):
+            if step == 'TakeOff':
+                
+
+                B8 = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                        TO_Flap_ID[0]]['B'].iloc[0]
+                theta = temperature_ratio_(Alt=0, Tapt=Tapt)
+                
+                W_delta_TO = weight / pressure_ratio_(Alt=0, Papt=Papt)
+                
+                thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                        thrust_rating[thrust_type]['TO']].reset_index(drop=True)
+                thrust_coeff =\
+                        Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                        thrust_rating[thrust_type][thrust_cfg[i]]].\
+                        reset_index(drop=True)
+                
+                if thrust_type == 'HiTemp':
+                    T_thrust = Tflex
+                else:
+                    T_thrust = Tapt
+
+                #Should be CAS of first point
+                Fn_delta = corrected_net_thrust(thrust_coeff,(cas)[i+1],
+                    temperature_profile(Alt=0, Tapt=T_thrust), Alt=0, Papt=Papt)
+                est_TO8 = TO_ground_roll_distance(B8, theta, W_delta_TO, N, 
+                        Fn_delta)
+            
+            elif step == 'Climb' and first_climb:
+                R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                        TO_Flap_ID[0]]['R'].iloc[0]
+
+                thrust_coeff =\
+                        Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                        thrust_rating[thrust_type][thrust_cfg[i]]].\
+                        reset_index(drop=True)
+
+                Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
+                        midpoint_Temps[i], mid_values(alt)[i], Papt)
+                #print(Fn_delta)
+                sins_gamma[i] = \
+                        sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
+                        mid_values(cas)[i])
+
+                #FIRST CAS
+
+                C = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                        TO_Flap_ID[0]]['C'].iloc[0]
+
+                est_first_climb_CAS = first_climb_CAS(C, weight)
+                #TODO recheck this following line!
+                radar_first_CAS = mid_values(cas)[i]
+
+
+                first_climb = False
+
+
+            elif step == 'Climb' and first_climb==False:
+                
+                R  = x[i]
+                #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                #        climb_Flap_ID[1]]['R'].iloc[0]
+                thrust_coeff = \
+                        Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                        thrust_rating[thrust_type][thrust_cfg[i]]].\
+                        reset_index(drop=True)
+
+                Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
+                        midpoint_Temps[i], mid_values(alt)[i], Papt)
+
+                sins_gamma[i] =\
+                        sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
+                        mid_values(cas)[i])
+            elif step == 'Accelerate' and first_accel:
+                
+                R  = x[i]
+
+                #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                #        accel_Flap_ID[0]]['R'].iloc[0]
+
+                thrust_coeff =\
+                        Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                    thrust_rating[thrust_type][thrust_cfg[i]]].\
+                    reset_index(drop=True)
+
+                Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
+                    midpoint_Temps[i], mid_values(alt)[i], Papt)
+                segment_accel[i] =\
+                        distance_accelerate(tas_diff[i],
+                    tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
+
+                first_accel = False
+                second_accel = True
+            elif step == 'Accelerate' and first_accel == False and \
+                    second_accel==True:
+
+                R  = x[i]
+                #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                #        accel_Flap_ID[1]]['R'].iloc[0]
+
+                thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                    thrust_rating[thrust_type]['TO']].reset_index(drop=True)
+                
+                thrust_coeff =\
+                        Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                    thrust_rating[thrust_type][thrust_cfg[i]]].\
+                    reset_index(drop=True)
+
+                Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
+                    midpoint_Temps[i], mid_values(alt)[i], Papt)
+                segment_accel[i] =\
+                        distance_accelerate(tas_diff[i],
+                    tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
+             
+                second_accel = False
+            elif step == 'Accelerate' and first_accel == False and \
+                    second_accel==False:
+
+                R  = x[i]
+                #R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
+                #        accel_Flap_ID[2]]['R'].iloc[0]
+
+                thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                    thrust_rating[thrust_type]['C']].reset_index(drop=True)
+                
+                thrust_coeff =\
+                        Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
+                    thrust_rating[thrust_type][thrust_cfg[i]]].\
+                    reset_index(drop=True)
+
+                Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
+                    midpoint_Temps[i], mid_values(alt)[i], Papt)
+                
+                segment_accel[i] = distance_accelerate(tas_diff[i],
+                    tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
+                
+    
+        sins_gamma_RADAR = sins_gamma_estimation(dist, alt, cas)
+        
+        
+        
+        #Cost calculation
+        sins_gamma_RADAR_o = sins_gamma_RADAR[steps=='Climb']            
+        seg_accel_RADAR_o  = np.diff(dist)[steps=='Accelerate']
+        
+        sins_gamma_o = sins_gamma[steps=='Climb']
+        seg_accel_o = segment_accel[steps=='Accelerate']
+        
+        cost_climb = np.mean((sins_gamma_o - \
+               sins_gamma_RADAR_o)**2)
+        
+        cost_accel = np.mean((seg_accel_o - \
+               seg_accel_RADAR_o)**2)
+        
+        cost_first_CAS = (est_first_climb_CAS - radar_first_CAS)**2
+
+        cost_TO8 = (est_TO8 - np.diff(dist)[steps=='TakeOff'])**2
+        
+        #cost = cost_climb + cost_accel + 2*cost_first_CAS/200 + cost_TO8[0]/1e8
+        cost = cost_first_CAS * cost_climb *  cost_accel **2 
+            
+        
+        if not model:
+            return cost
+        else:
+            return sins_gamma, segment_accel, est_first_climb_CAS, est_TO8,\
+                cas
 
     def new_vert_profile(self, column_names, op_type = 'D'):
         
@@ -695,7 +692,20 @@ class NoiseCraft:
                         accel_Flap_ID[2]]['R'].iloc[0]
                 flaps = np.r_[flaps, R]
 
+        
+        # Different thrust_cutback_points 
+        n_steps = len(self.steps)
+        n_configs = 3
+        thrust_modes = np.empty((n_configs, n_steps), dtype='S2')
+        for i, n in enumerate([3, 4, 5]):
+            to_thrust = np.array(['TO']*n)
+            c_thrust  = np.array(['C']*(n_steps - n))
+            thrust_modes[i,:] = np.concatenate((to_thrust, c_thrust), axis=0)
+        thrust_modes = thrust_modes.astype(str)
 
+        
+        ########################################################################
+        
         stage_length = 1
         weight = self.Default_weights[self.Default_weights['Stage Length']==\
         stage_length]['Weight (lb)'].iloc[0]
@@ -714,8 +724,21 @@ class NoiseCraft:
         for flap_bound in flap_bounds:
             bounds.append(flap_bound)
         #new_profile = optimize.differential_evolution(loss, bounds)
-        new_profile2 = optimize.minimize(_loss, x0, bounds=bounds, args=(self,
-            column_names))
+        
+        new_profile2 = optimize.minimize(self._loss, x0, bounds=bounds, args=(
+            column_names, thrust_modes[0, :]))
+        cost = new_profile2.fun
+        n_min = 0
+        for n in np.arange(n_configs)[1:]:
+            new_profile2_ = optimize.minimize(self._loss, x0, bounds=bounds, args=(
+                column_names, thrust_modes[n, :]))
+            cost_ = new_profile2_.fun
+            if cost_ < cost:
+                cost = cost_
+                new_profile2 = new_profile2_
+                n_min = n
+        
+        self.thrust_cfg = thrust_modes[n_min, :]
         #self.weight_GA = new_profile.x[0]
         #self.Tflex_GA  = new_profile.x[1]
         #self.flaps_GA  = new_profile.x[2:]
@@ -728,207 +751,8 @@ class NoiseCraft:
 
     
     def plot_ANP_profile(self, column_names, op_type = 'D'):
-        #def model(x):
-        #    weight = x[0]
-        #    Tflex  = x[1]
-
-
-        #    dist   = self.d_seg
-        #    alt    = self.h_seg
-        #    cas    = self.cas_seg
-        #    times  = self.time_seg
-        #    steps = self.steps
-        #    
-        #    def mid_values(vec):
-        #        return (vec[1:] + vec[:-1]) / 2
-        #    def sins_gamma_estimation(dist, alt, cas):
-        #        climbs_deltaH = np.diff(alt)
-        #        climbs_deltaS = np.diff(dist)
-        #        sins_gamma = climbs_deltaH /\
-        #                np.sqrt(climbs_deltaH**2 + climbs_deltaS**2)
-        #        return sins_gamma
-        #    
-        #    Tapt = self.Meteo[column_names['Temperature']].iloc[0]
-        #    Papt = self.Meteo[column_names['Pressure']].iloc[0]
-
-        #    Tflex = (Tflex * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
-
-        #    
-        #    Aero_coeff = self.Aerodynamic_coefficients
-        #    dep_Aero_coeff = Aero_coeff[Aero_coeff["Op Type"] == op_type]
-        #    Tapt = (Tapt * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
-        #    Papt = Papt / 33.864 #Conversion mbar to inHg (not ideal)
-        #    
-
-        #    sigmas       = air_density_ratio(alt, Tapt, Papt)
-        #    tas          = np.multiply(cas, np.reciprocal(np.sqrt(sigmas)))
-        #    mean_sigmas  = mid_values(sigmas)
-        #    mean_sigmas_ = air_density_ratio(mid_values(alt), Tapt, Papt)
-
-        #    tas_geom_mean = np.sqrt(mid_values(np.power(tas, 2))) #Impact eq-17
-        #    tas_diff      = np.diff(np.power(tas, 2))
-        #    deltas        = pressure_ratio_(alt, Papt)
-        #    mean_deltas   = mid_values(deltas)
-        #    #print(deltas)
-        #    W_delta       = weight * np.reciprocal(mean_deltas)
-
-        #    
-        #    
-        #    first_climb = True
-        #    first_accel = True
-
-
-        #    #Obtain flaps by type of step: Accel, TO, Climb for now
-        #    dep_steps = self.Departure_steps[['Step Number', 'Step Type',
-        #        'Thrust Rating', 'Flap_ID']]
-        #    climb_Flap_ID = dep_steps[dep_steps['Step Type']==\
-        #            'Climb']['Flap_ID'].unique()
-        #    TO_Flap_ID = dep_steps[dep_steps['Step Type']==\
-        #            'Takeoff']['Flap_ID'].unique() #climb_Flap_ID[0] 
-        #    accel_Flap_ID = dep_steps[dep_steps['Step Type']==\
-        #            'Accelerate']['Flap_ID'].unique()
-
-        #    N = self.Aircraft['Number Of Engines'].iloc[0]
-
-        #    Jet_eng_coeff = self.Jet_engine_coefficients
-        #    thrust_rating = {'Reg'   : {'C': 'MaxClimb', 'TO' : 'MaxTakeoff'},
-        #                     'HiTemp': {'C': 'MaxClimbHiTemp', 'TO' : 'MaxTkoffHiTemp'}
-        #                     }
-        #    thrust_type = 'HiTemp'
-
-        #    
-        #    if thrust_type == 'HiTemp':
-        #        midpoint_Temps = temperature_profile(mid_values(alt), Tflex)
-        #    else:
-        #        midpoint_Temps = temperature_profile(mid_values(alt), Tapt)
-
-        #    sins_gamma = np.zeros(np.shape(steps))
-        #    segment_accel = np.zeros(np.shape(steps))
-        #    ROCs = np.multiply(np.diff(alt), np.reciprocal(np.diff(times))) * 60.
-        #    self.ROCs = ROCs #ft/min
-
-        #    for i, step in enumerate(steps):
-        #        if step == 'TakeOff':
-        #            
-
-        #            B8 = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    TO_Flap_ID[0]]['B'].iloc[0]
-        #            theta = temperature_ratio_(Alt=0, Tapt=Tapt)
-        #            
-        #            W_delta_TO = weight / pressure_ratio_(Alt=0, Papt=Papt)
-        #            
-        #            thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-        #                    thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-        #            
-        #            if thrust_type == 'HiTemp':
-        #                T_thrust = Tflex
-        #            else:
-        #                T_thrust = Tapt
-
-        #            #Should be CAS of first point
-        #            Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-        #                temperature_profile(Alt=0, Tapt=T_thrust), Alt=0, Papt=Papt)
-        #            est_TO8 = TO_ground_roll_distance(B8, theta, W_delta_TO, N, 
-        #                    Fn_delta)
-        #        
-        #        elif step == 'Climb' and first_climb:
-        #            R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    TO_Flap_ID[0]]['R'].iloc[0]
-
-        #            thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-        #                    thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-
-        #            Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-        #                    midpoint_Temps[i], mid_values(alt)[i], Papt)
-        #            #print(Fn_delta)
-        #            sins_gamma[i] = sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
-        #                    mid_values(cas)[i])
-
-        #            #FIRST CAS
-
-        #            C = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    TO_Flap_ID[0]]['C'].iloc[0]
-
-        #            est_first_climb_CAS = first_climb_CAS(C, weight)
-        #            radar_first_CAS = cas[i]
-
-
-        #            first_climb = False
-
-
-        #        elif step == 'Climb' and first_climb==False:
-
-        #            R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    climb_Flap_ID[1]]['R'].iloc[0]
-        #            R = x[i]
-        #            thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-        #                    thrust_rating[thrust_type]['C']].reset_index(drop=True)
-
-        #            Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-        #                    midpoint_Temps[i], mid_values(alt)[i], Papt)
-
-        #            sins_gamma[i] = sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
-        #                    mid_values(cas)[i])
-        #        elif step == 'Accelerate' and first_accel:
-        #            
-
-        #            R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    accel_Flap_ID[0]]['R'].iloc[0]
-        #            R = x[i]
-
-        #            thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-        #                thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-
-        #            Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-        #                midpoint_Temps[i], mid_values(alt)[i], Papt)
-        #            segment_accel[i] = distance_accelerate(tas_diff[i],
-        #                tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
-
-        #            first_accel = False
-        #            second_accel = True
-        #        elif step == 'Accelerate' and first_accel == False and \
-        #                second_accel==True:
-
-        #            R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    accel_Flap_ID[1]]['R'].iloc[0]
-        #            R = x[i]
-
-        #            thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-        #                thrust_rating[thrust_type]['TO']].reset_index(drop=True)
-
-        #            Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-        #                midpoint_Temps[i], mid_values(alt)[i], Papt)
-        #            segment_accel[i] = distance_accelerate(tas_diff[i],
-        #                tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
-        #         
-        #            second_accel = False
-        #        elif step == 'Accelerate' and first_accel == False and \
-        #                second_accel==False:
-
-        #            R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
-        #                    accel_Flap_ID[2]]['R'].iloc[0]
-        #            R = x[i]
-
-        #            thrust_coeff = Jet_eng_coeff[Jet_eng_coeff['Thrust Rating']==\
-        #                thrust_rating[thrust_type]['C']].reset_index(drop=True)
-
-        #            Fn_delta = corrected_net_thrust(thrust_coeff, (cas)[i+1],
-        #                midpoint_Temps[i], mid_values(alt)[i], Papt)
-        #            segment_accel[i] = distance_accelerate(tas_diff[i],
-        #                tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
-        #            
-        #
-        #    #sins_gamma_radar = sins_gamma_estimation(dist, alt, cas)
-        #    #
-        #    #sins_gamma_radar_o = sins_gamma_est[steps=='Climb']            
-        #    #seg_accel_o = segment_accel[steps=='Accelerate']
-
-        #    return sins_gamma, segment_accel, est_first_climb_CAS, est_TO8,\
-        #            cas
-
-        #sins, accels, first_cas, to8, cas = model(self.x_GA)
         sins_g, accels_g, first_cas_g, to8_g, cas_g =\
-                _loss(self.x_grad, self, column_names, model=True)
+                self._loss(self.x_grad, column_names, self.thrust_cfg, model=True)
         
         #sins_p, accels_p, first_cas_p, to8_p, cas_p =\
         #        model([self.weight_pinv, self.Tflex_pinv])
