@@ -418,6 +418,7 @@ class NoiseCraft:
         
         Tapt = self.Meteo[column_names['Temperature']].iloc[0]
         Papt = self.Meteo[column_names['Pressure']].iloc[0]
+        wind_speed = self.Meteo[column_names['WindSpeed']].iloc[0]
 
         Tflex = (Tflex * 9/5) + 32.0 #Conversion to Farenheit from C (not ideal)
 
@@ -440,7 +441,11 @@ class NoiseCraft:
         #print(deltas)
         W_delta       = weight * np.reciprocal(mean_deltas)
 
-        
+        if model==True:  
+            self.Tapt    = Tapt
+            self.Papt    = Papt
+            self.TAS     = tas
+            self.THR_SET = []
         
         first_climb = True
         first_accel = True
@@ -507,6 +512,9 @@ class NoiseCraft:
                     temperature_profile(Alt=0, Tapt=T_thrust), Alt=0, Papt=Papt)
                 est_TO8 = TO_ground_roll_distance(B8, theta, W_delta_TO, N, 
                         Fn_delta)
+
+                if model:
+                    self.THR_SET.append(Fn_delta)
             
             elif step == 'Climb' and first_climb:
                 R = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
@@ -524,6 +532,12 @@ class NoiseCraft:
                         sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
                         mid_values(cas)[i])
 
+                correction = (cas[i+1] - 8) /\
+                             (cas[i+1] - wind_speed)
+                gamma = np.arcsin(sins_gamma[i]) * correction
+
+                sins_gamma[i] = np.sin(gamma)
+
                 #FIRST CAS
 
                 C = dep_Aero_coeff[dep_Aero_coeff['Flap_ID']==\
@@ -536,6 +550,8 @@ class NoiseCraft:
 
                 first_climb = False
 
+                if model:
+                    self.THR_SET.append(Fn_delta)
 
             elif step == 'Climb' and first_climb==False:
                 
@@ -553,6 +569,15 @@ class NoiseCraft:
                 sins_gamma[i] =\
                         sin_of_climb_angle(N, Fn_delta, W_delta[i], R,
                         mid_values(cas)[i])
+                
+                correction = (cas[i+1] - 8) /\
+                             (cas[i+1] - wind_speed)
+                gamma = np.arcsin(sins_gamma[i]) * correction
+
+                sins_gamma[i] = np.sin(gamma)
+
+                if model:
+                    self.THR_SET.append(Fn_delta)
             elif step == 'Accelerate' and first_accel:
                 
                 R  = x[i]
@@ -571,8 +596,15 @@ class NoiseCraft:
                         distance_accelerate(tas_diff[i],
                     tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
 
+                correction = (tas_geom_mean[i] - wind_speed)/\
+                             (tas_geom_mean[i] -     8     )
+                segment_accel[i] *= correction
+
                 first_accel = False
                 second_accel = True
+
+                if model:
+                    self.THR_SET.append(Fn_delta)
             elif step == 'Accelerate' and first_accel == False and \
                     second_accel==True:
 
@@ -593,8 +625,15 @@ class NoiseCraft:
                 segment_accel[i] =\
                         distance_accelerate(tas_diff[i],
                     tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
+                
+                correction = (tas_geom_mean[i] - wind_speed) / \
+                             (tas_geom_mean[i] -     8     )
+                segment_accel[i] *= correction
              
                 second_accel = False
+
+                if model:
+                    self.THR_SET.append(Fn_delta)
             elif step == 'Accelerate' and first_accel == False and \
                     second_accel==False:
 
@@ -615,6 +654,13 @@ class NoiseCraft:
                 
                 segment_accel[i] = distance_accelerate(tas_diff[i],
                     tas_geom_mean[i], N, Fn_delta, W_delta[i], R, ROCs[i])
+                
+                correction = (tas_geom_mean[i] - wind_speed) / \
+                             (tas_geom_mean[i] -     8     )
+                segment_accel[i] *= correction
+
+                if model:
+                    self.THR_SET.append(Fn_delta)
                 
     
         sins_gamma_RADAR = sins_gamma_estimation(dist, alt, cas)
@@ -666,6 +712,8 @@ class NoiseCraft:
                 'Accelerate']['Flap_ID'].unique()
                 
 
+        #TODO improve guess value selection for flaps
+        
         first_climb = True
         first_accel = True
         flaps = np.r_[[]]
@@ -709,6 +757,8 @@ class NoiseCraft:
         stage_length = 1
         weight = self.Default_weights[self.Default_weights['Stage Length']==\
         stage_length]['Weight (lb)'].iloc[0]
+
+        self.weight_default = weight
         Tflex = 60. #Celsius 
 
         
@@ -759,11 +809,18 @@ class NoiseCraft:
         #
         #
         #weight = ((self.cas_seg[1:] + self.cas_seg[:-1])[1]/2 / 0.394884)**2
-        #Tflex = 50
-        #sins_n, accels_n, first_cas_n, to8_n, cas_n =\
-        #        model([weight, Tflex])
+       #Tflex  = self.Tapt
+       #weight = self.weight_default
+       #x_n = [weight,  Tflex, 0.071403, 0.056281, 0.056281, 0.056281, 0.056281,
+       #        0.056281, 0.056281, 0.056281, 0.056281, 0.056281]
+       #sins_n, accels_n, first_cas_n, to8_n, cas_n =\
+       #        self._loss(x_n, column_names, )
         
         def generate_profile_points(first_cas, sins, accels, to8 = None, after_TO = True):
+            end_point_altitude = np.empty(len(self.steps))
+            end_point_CAS      = np.empty(len(self.steps))
+            end_point_altitude[:] = np.NaN
+            end_point_CAS[:]      = np.NaN
             for i, step in enumerate(self.steps):
                 if step == 'TakeOff':
                     if after_TO:
@@ -779,10 +836,15 @@ class NoiseCraft:
                     d_anp = np.r_[d_anp, d_anp[-1] + (np.diff(self.h_seg)[i] \
                             /np.tan(np.arcsin(sins[i])))]
                     cas_anp = np.r_[cas_anp, cas_anp[-1]]
+                    end_point_altitude[i] = (h_anp[-1])
                 elif step == 'Accelerate':
                     h_anp   = np.r_[h_anp, (self.h_seg)[i+1]]
                     d_anp   = np.r_[d_anp, d_anp[-1] + accels[i]]
                     cas_anp = np.r_[cas_anp, (self.cas_seg)[i+1]]
+                    end_point_CAS[i] = (cas_anp[-1])
+
+            self.End_Point_Cas = end_point_CAS
+            self.End_Point_Alt = end_point_altitude
             return h_anp, d_anp, cas_anp
         
         #self.h_anp, self.d_anp, self.cas_anp = generate_profile_points(first_cas,
@@ -824,6 +886,85 @@ class NoiseCraft:
             plt.show()
 
         plot_anp()
+
+    def map_flaps(self, op_type='D'):
+        
+        Aero_coeff = self.Aerodynamic_coefficients
+        dep_Aero_coeff = Aero_coeff[Aero_coeff["Op Type"] == op_type]
+        dep_steps = self.Departure_steps[['Step Number', 'Step Type',
+            'Thrust Rating', 'Flap_ID']]
+        
+        TO_Flap_ID = dep_steps[dep_steps['Step Type']==\
+                'Takeoff']['Flap_ID'].unique() #climb_Flap_ID[0] 
+
+
+
+        df_flaps = \
+                self.Aerodynamic_coefficients[self.Aerodynamic_coefficients['Op Type']\
+                == op_type][['R', 'Flap_ID']].reset_index(drop=True)
+        
+        df_flaps = df_flaps.sort_values(by='R').reset_index(drop=True)
+
+        n_flaps = len(df_flaps)
+        flaps_cont = self.flaps_grad
+        
+        flap_Rs = df_flaps['R'].to_numpy()
+        domain  = max(flap_Rs) - min(flap_Rs)
+        
+        tresholds = {}
+        for count, flap_nm in enumerate(df_flaps['Flap_ID'].to_numpy()):
+            treshold  = min(flap_Rs) + (count+1) * domain / n_flaps
+            tresholds[flap_nm] = treshold 
+        
+        epsilon = 1e-7
+        
+        Flap_ID = np.empty(len(flaps_cont), dtype='S10')
+        for flap_nm, treshold in tresholds.items():
+            mask = (flaps_cont > treshold - domain/n_flaps - epsilon)  & \
+                   (flaps_cont <= treshold)
+            Flap_ID[mask] = flap_nm
+        
+        Flap_ID = Flap_ID.astype(str)
+        Flap_ID = np.r_[[TO_Flap_ID[0], TO_Flap_ID[0]], Flap_ID]
+        self.Flap_ID = Flap_ID
+             
+
+    def generate_ANP_user_steps(self):
+        
+        ROCs_filtered = np.empty(len(self.steps))
+        ROCs_filtered[:] = np.NaN
+        ROCs_filtered[self.steps=='Accelerate'] = self.ROCs[self.steps==\
+                'Accelerate']
+        dicti = {
+                    'Step Type': self.steps,
+                    'Thrust Rating':
+                    ['MaxTakeoff' if thrust=='TO' else 'MaxClimb'\
+                            for thrust in self.thrust_cfg],
+                    'Flap_ID' : self.Flap_ID,
+                    'End Point Altitude (ft)': self.End_Point_Alt,
+                    'End Point CAS (kt)'     : self.End_Point_Cas,
+                    'Rate Of Climb (ft/min)' : ROCs_filtered,
+                    'Weight (lbs)' : self.weight_grad,
+                    'Tflex (C)'    : self.Tflex_grad
+                    }
+
+        df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in dicti.items()]))
+        
+        df.to_csv('Procedural_Steps.csv', index=False)
+
+    def gen_fixed_point_profiles(self):
+        
+        dicti = {
+                'Distance': self.d_anp_g,
+                'Altitude': self.h_anp_g,
+                'Speed'   : self.TAS[1:],
+                'THR_SET' : self.THR_SET
+                }
+        pdb.set_trace()
+        df = pd.DataFrame(dicti)
+
+        df.to_csv('Fixed_Point_Profiles.csv', index=False)
+
     
     def new_vert_profile_pinv(self, column_names, op_type = 'D'):
         

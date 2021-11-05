@@ -99,6 +99,10 @@ def main():
         craft.plot_segmented()
         craft.plot_ANP_profile(column_names)
 
+    craft.map_flaps()
+    craft.generate_ANP_user_steps()
+    craft.gen_fixed_point_profiles()
+
     return 0, craft, origin
 
 
