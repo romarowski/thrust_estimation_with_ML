@@ -42,17 +42,42 @@ class NoiseCraft:
         pass
 
     def load_meteo(self, folder, filename):
-        path = os.path.join('data', 'radar_tracks_n_meteo', folder) 
-        #Improve,  makes no sense like this, '/' is Linux only
+        path = 'input'
+        #path = os.path.join('data', 'radar_tracks_n_meteo', folder) 
         self.Meteo = pd.read_csv(os.path.join(path, filename))
         self._Meteo_loaded = True
         pass
 
     def load_radar(self, folder, filename):
-        path = os.path.join('data', 'radar_tracks_n_meteo', folder)
-        self.Radar = pd.read_csv(os.path.join(path, filename))
+        path = 'input'
+        #path = os.path.join('data', 'radar_tracks_n_meteo', folder)
+        self.Radar_raw = pd.read_csv(os.path.join(path, filename))
         self._Radar_loaded = True
         pass
+
+    def clean_radar_data(self, column_names, op_type='D'):
+        max_height = 10100 #[ft]
+        df = self.Radar_raw
+        
+        mask_h = np.flatnonzero(df[column_names['Altitude']] >= max_height)
+        loc_max = mask_h[0] + 1
+
+        df = df.iloc[:loc_max].reset_index(drop=True)
+
+        look_back_speed = 1 
+
+        min_speed = 50 #[kts]
+
+        mask_s = np.flatnonzero(df[column_names['GroundSpeed']] >= min_speed)
+        
+        loc_min = mask_s[0] - look_back_speed
+
+        df = df.iloc[loc_min:].reset_index(drop=True)
+
+        self.Radar = df
+
+        pass
+
 
     def calculate_CAS(self, column_names):
         if self._Meteo_loaded   == False:
@@ -754,7 +779,41 @@ class NoiseCraft:
         
         ########################################################################
         
-        stage_length = 1
+        def estimate_stage_length(column_names):
+            origin = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
+                    .iloc[0]
+            end = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
+                    .iloc[-1]
+
+            dist_ft = haversine(end.to_numpy(), origin.to_numpy())
+
+            ft2nm = 0.000164579 
+
+            dist_nm = dist_ft * ft2nm
+
+            if dist_nm <= 500:
+                stage_length = 1
+            elif dist_nm > 500 & dist_nm <= 1000:
+                stage_length = 2
+            elif dist_nm > 1000 & dist_nm <= 1500:
+                stage_length = 3 
+            elif dist_nm > 1500 & dist_nm <= 2500:
+                stage_length = 4
+            elif dist_nm > 2500 & dist_nm <= 3500:
+                stage_length = 5
+            elif dist_nm > 3500 & dist_nm <= 4500:
+                stage_length = 6
+            elif dist_nm > 4500 & dist_nm <= 5500:
+                stage_length = 7
+            elif dist_nm > 5500 & dist_nm <= 6500:
+                stage_length = 8 
+            else:
+                stage_length = 9
+
+
+            return stage_length
+        
+        stage_length = estimate_stage_length(column_names)
         weight = self.Default_weights[self.Default_weights['Stage Length']==\
         stage_length]['Weight (lb)'].iloc[0]
 
@@ -851,7 +910,10 @@ class NoiseCraft:
         #    sins, accels)
 
         self.h_anp_g, self.d_anp_g, self.cas_anp_g = \
-                generate_profile_points(first_cas_g, sins_g, accels_g)
+                generate_profile_points(first_cas_g, sins_g, accels_g, to8=None,
+                        after_TO=True)
+
+        self.to8_g = to8_g
 
 
         def plot_anp():
@@ -863,27 +925,29 @@ class NoiseCraft:
             CAS = self.cas
             
             plt.subplot(211)
-            plt.plot(X, Y, '.', label='Radar')
+            plt.plot(X, Y, '.b', label='Radar')
             plt.plot(px, py, '-or', label='Seg')
             #plt.plot(self.d_anp, self.h_anp, '-og', label='GA')
             #plt.plot(self.d_anp_p, self.h_anp_p, '-oy', label='pinv')
-            plt.plot(self.d_anp_g, self.h_anp_g, '-om', label='grad')
-            plt.xlabel('Dist [ft]')
+            plt.plot(self.d_anp_g, self.h_anp_g, '-og', label='ANP')
+            #plt.xlabel('Dist [ft]')
             plt.ylabel('Alt [ft]')
             plt.legend()
             
             plt.subplot(212)
-            plt.plot(X, CAS, '.', label='Radar')
+            plt.plot(X, CAS, '.b', label='Radar')
             plt.plot(px, pcas, '-or', label='Seg')
             #plt.plot(self.d_anp, self.cas_anp, '-og', label='GA')
             #plt.plot(self.d_anp_p, self.cas_anp_p, '-oy', label='pinv')
-            plt.plot(self.d_anp_g, self.cas_anp_g, '-om', label='grad')
+            plt.plot(self.d_anp_g, self.cas_anp_g, '-og', label='ANP')
             plt.xlabel('Dist [ft]')
             plt.ylabel('CAS [kts]')
             #plt.legend()
 
             
-            plt.show()
+            #plt.show()
+            plt.savefig(os.path.join('output', 'vert_profile.png'))
+            plt.close()
 
         plot_anp()
 
@@ -950,7 +1014,7 @@ class NoiseCraft:
 
         df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in dicti.items()]))
         
-        df.to_csv('Procedural_Steps.csv', index=False)
+        df.to_csv(os.path.join('output','Procedural_Steps.csv'), index=False)
 
     def gen_fixed_point_profiles(self):
         
@@ -960,10 +1024,9 @@ class NoiseCraft:
                 'Speed'   : self.TAS[1:],
                 'THR_SET' : self.THR_SET
                 }
-        pdb.set_trace()
-        df = pd.DataFrame(dicti)
 
-        df.to_csv('Fixed_Point_Profiles.csv', index=False)
+        df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in dicti.items()]))
+        df.to_csv(os.path.join('output', 'Fixed_Point_Profiles.csv'), index=False)
 
     
     def new_vert_profile_pinv(self, column_names, op_type = 'D'):
