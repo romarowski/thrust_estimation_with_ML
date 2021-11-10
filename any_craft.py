@@ -83,8 +83,8 @@ def main():
 
 
     
-    #if plot_:         
-        #craft.plot_segmented()
+    if plot_:         
+        craft.plot_segmented()
     
     if after_TO:
         craft.extrapolate_TO_distance()
@@ -111,7 +111,7 @@ def main():
     #craft.new_vert_profile_pinv(column_names)
     
     if plot_:
-        #craft.plot_segmented()
+        craft.plot_segmented()
         craft.plot_ANP_profile(column_names)
 
     craft.map_flaps()

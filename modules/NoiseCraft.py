@@ -274,8 +274,11 @@ class NoiseCraft:
                     penalty_FC = max(0, np.diff(pcas)[1])**2
                     penalty_TO = max(0, np.diff(py)[0])**2
                 
-                penalty_CAS = max(0, np.mean(np.diff(pcas)))**2
-                penalty_y   = max(0, np.mean(np.diff(pcas)))**2 
+                #penalty_CAS = max(0, np.mean(np.diff(pcas)))**2
+                #penalty_y   = max(0, np.mean(np.diff(pcas)))**2 
+                penalty_CAS = 0.
+                penalty_y   = 0.
+
                 #if not np.all(np.diff(pcas)>=0):
                 #    penalty_CAS = 1e10
                 #else:
@@ -356,32 +359,32 @@ class NoiseCraft:
         times = self.time
         
         plt.subplot(221)
-        plt.plot(X, Y, '.', label='Radar')
-        plt.plot(px, py, '-or', label='Model')
-        plt.xlabel('Dist [ft]')
+        plt.plot(X, Y, '.b', label='Radar')
+        plt.plot(px, py, '-or', label='Seg')
+        #plt.xlabel('Dist [ft]')
         plt.ylabel('Alt [ft]')
         plt.legend()
         
         plt.subplot(223)
-        plt.plot(X, CAS, '.', label='Radar')
+        plt.plot(X, CAS, '.b', label='Radar')
         plt.plot(px, pcas, '-or', label='Model')
         plt.xlabel('Dist [ft]')
         plt.ylabel('CAS [kts]')
-        plt.legend()
+        #plt.legend()
 
         plt.subplot(222)
-        plt.plot(times, Y, '.', label='Radar')
+        plt.plot(times, Y, '.b', label='Radar')
         plt.plot(ptimes, py, '-or', label='Model')
-        plt.xlabel('Time [s]')
-        plt.ylabel('Alt [ft]')
-        plt.legend()
+        #plt.xlabel('Time [s]')
+        #plt.ylabel('Alt [ft]')
+        #plt.legend()
 
         plt.subplot(224)
-        plt.plot(times, CAS, '.', label='Radar')
+        plt.plot(times, CAS, '.b', label='Radar')
         plt.plot(ptimes, pcas, '-or', label='Model')
         plt.xlabel('Time [s]')
-        plt.ylabel('CAS [kts]')
-        plt.legend()
+        #plt.ylabel('CAS [kts]')
+        #plt.legend()
         
         plt.show()
 
@@ -791,21 +794,21 @@ class NoiseCraft:
 
             dist_nm = dist_ft * ft2nm
 
-            if dist_nm <= 500:
+            if dist_nm <= 500.:
                 stage_length = 1
-            elif dist_nm > 500 & dist_nm <= 1000:
+            elif (dist_nm > 500.) and (dist_nm <= 1000.):
                 stage_length = 2
-            elif dist_nm > 1000 & dist_nm <= 1500:
+            elif (dist_nm > 1000.) and (dist_nm <= 1500.):
                 stage_length = 3 
-            elif dist_nm > 1500 & dist_nm <= 2500:
+            elif (dist_nm > 1500.) and (dist_nm <= 2500.):
                 stage_length = 4
-            elif dist_nm > 2500 & dist_nm <= 3500:
+            elif (dist_nm > 2500.) and (dist_nm <= 3500.):
                 stage_length = 5
-            elif dist_nm > 3500 & dist_nm <= 4500:
+            elif (dist_nm > 3500.) and (dist_nm <= 4500.):
                 stage_length = 6
-            elif dist_nm > 4500 & dist_nm <= 5500:
+            elif (dist_nm > 4500.) and (dist_nm <= 5500.):
                 stage_length = 7
-            elif dist_nm > 5500 & dist_nm <= 6500:
+            elif (dist_nm > 5500.) and (dist_nm <= 6500.):
                 stage_length = 8 
             else:
                 stage_length = 9
@@ -945,9 +948,9 @@ class NoiseCraft:
             #plt.legend()
 
             
-            #plt.show()
-            plt.savefig(os.path.join('output', 'vert_profile.png'))
-            plt.close()
+            plt.show()
+            #plt.savefig(os.path.join('output', 'vert_profile.png'))
+            #plt.close()
 
         plot_anp()
 
