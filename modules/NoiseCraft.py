@@ -783,35 +783,48 @@ class NoiseCraft:
         ########################################################################
         
         def estimate_stage_length(column_names):
-            origin = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
-                    .iloc[0]
-            end = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
-                    .iloc[-1]
+            
+            if self.Radar_raw[column_names['Altitude']].iloc[-1] == 0:
+                origin = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
+                        .iloc[0]
+                end = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
+                        .iloc[-1]
 
-            dist_ft = haversine(end.to_numpy(), origin.to_numpy())
+                dist_ft = haversine(end.to_numpy(), origin.to_numpy())
 
-            ft2nm = 0.000164579 
+                ft2nm = 0.000164579 
 
-            dist_nm = dist_ft * ft2nm
+                dist_nm = dist_ft * ft2nm
 
-            if dist_nm <= 500.:
-                stage_length = 1
-            elif (dist_nm > 500.) and (dist_nm <= 1000.):
-                stage_length = 2
-            elif (dist_nm > 1000.) and (dist_nm <= 1500.):
-                stage_length = 3 
-            elif (dist_nm > 1500.) and (dist_nm <= 2500.):
-                stage_length = 4
-            elif (dist_nm > 2500.) and (dist_nm <= 3500.):
-                stage_length = 5
-            elif (dist_nm > 3500.) and (dist_nm <= 4500.):
-                stage_length = 6
-            elif (dist_nm > 4500.) and (dist_nm <= 5500.):
-                stage_length = 7
-            elif (dist_nm > 5500.) and (dist_nm <= 6500.):
-                stage_length = 8 
+                if dist_nm <= 500.:
+                    stage_length = 1
+                elif (dist_nm > 500.) and (dist_nm <= 1000.):
+                    stage_length = 2
+                elif (dist_nm > 1000.) and (dist_nm <= 1500.):
+                    stage_length = 3 
+                elif (dist_nm > 1500.) and (dist_nm <= 2500.):
+                    stage_length = 4
+                elif (dist_nm > 2500.) and (dist_nm <= 3500.):
+                    stage_length = 5
+                elif (dist_nm > 3500.) and (dist_nm <= 4500.):
+                    stage_length = 6
+                elif (dist_nm > 4500.) and (dist_nm <= 5500.):
+                    stage_length = 7
+                elif (dist_nm > 5500.) and (dist_nm <= 6500.):
+                    stage_length = 8 
+                else:
+                    stage_length = 9
             else:
-                stage_length = 9
+                sl = []
+                while sl not in [1,2,3,4,5,6,7,8,9]:
+                    try:
+                        sl=int(input('Flight is not complete, enter the stage length: '))
+                    except:
+                        print('Enter a valid stage length')
+
+                stage_length = sl
+
+                    
 
 
             return stage_length
