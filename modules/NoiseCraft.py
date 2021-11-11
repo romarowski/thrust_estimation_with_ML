@@ -139,7 +139,7 @@ class NoiseCraft:
         d = flight['distance (ft)'].to_numpy()
         h = flight[column_names['Altitude']].to_numpy()
         cas = flight['CAS (kts)'].to_numpy()
-        time = flight['snapshot_id'].to_numpy()
+        time = flight[column_names['Time']].to_numpy()
         time -= time[0]
         #cas_o = cas[ydata>0]
         #xdata_o = xdata[ydata>0]
@@ -542,6 +542,10 @@ class NoiseCraft:
                         Fn_delta)
 
                 if model:
+                    Vc_0 = 0
+                    Fn_delta_0 = corrected_net_thrust(thrust_coeff, Vc_0,
+                        temperature_profile(Alt=0, Tapt=T_thrust), Alt=0, Papt=Papt)
+                    self.THR_SET.append(Fn_delta_0)
                     self.THR_SET.append(Fn_delta)
             
             elif step == 'Climb' and first_climb:
@@ -783,7 +787,6 @@ class NoiseCraft:
         ########################################################################
         
         def estimate_stage_length(column_names):
-            
             if self.Radar_raw[column_names['Altitude']].iloc[-1] == 0:
                 origin = self.Radar_raw[[column_names['Lon'], column_names['Lat']]]\
                         .iloc[0]
@@ -823,10 +826,6 @@ class NoiseCraft:
                         print('Enter a valid stage length')
 
                 stage_length = sl
-
-                    
-
-
             return stage_length
         
         stage_length = estimate_stage_length(column_names)
@@ -877,7 +876,8 @@ class NoiseCraft:
     
     def plot_ANP_profile(self, column_names, op_type = 'D'):
         sins_g, accels_g, first_cas_g, to8_g, cas_g =\
-                self._loss(self.x_grad, column_names, self.thrust_cfg, model=True)
+                self._loss(self.x_grad, column_names, self.thrust_cfg, model=True,
+                        )
         
         #sins_p, accels_p, first_cas_p, to8_p, cas_p =\
         #        model([self.weight_pinv, self.Tflex_pinv])
@@ -961,9 +961,9 @@ class NoiseCraft:
             #plt.legend()
 
             
-            plt.show()
-            #plt.savefig(os.path.join('output', 'vert_profile.png'))
-            #plt.close()
+            #plt.show()
+            plt.savefig(os.path.join('output', 'vert_profile.png'))
+            plt.close()
 
         plot_anp()
 
@@ -1032,17 +1032,31 @@ class NoiseCraft:
         
         df.to_csv(os.path.join('output','Procedural_Steps.csv'), index=False)
 
-    def gen_fixed_point_profiles(self):
+    def gen_fixed_point_profiles(self, plot=True):
         
+        d = np.r_[0, self.d_anp_g],
+        h = np.r_[0, self.h_anp_g]
+        d=np.reshape(d,(max(np.shape(d)),))
+        h=np.reshape(h,(max(np.shape(h)),))
         dicti = {
-                'Distance': self.d_anp_g,
-                'Altitude': self.h_anp_g,
-                'Speed'   : self.TAS[1:],
+                'Distance': d,
+                'Altitude': h,
+                'Speed'   : self.TAS,
                 'THR_SET' : self.THR_SET
                 }
 
         df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in dicti.items()]))
         df.to_csv(os.path.join('output', 'Fixed_Point_Profiles.csv'), index=False)
+        if plot:
+            plt.plot(d, self.THR_SET, 
+                    '-ok', label='CNT')
+            plt.xlabel('Dist [ft]')
+            plt.ylabel('Thrust [lbs]')
+            plt.legend()
+            #plt.show()
+            plt.savefig(os.path.join('output', 'thrust.png'))
+            plt.close()
+
 
     
     def new_vert_profile_pinv(self, column_names, op_type = 'D'):
