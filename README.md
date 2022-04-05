@@ -6,7 +6,17 @@ In this work we propose the use of real vertical profiles (obtained from ADS-B d
 configuration, etc.) by performing an advanced curve fitting algorigthm similar to that introduced by Yang et. al. on Mathematical Programming for Piecewise 
 Linear Regression Analysis (2016). We run a multi-objective optimization on the aerodynamic equations presented in Appendix B of ECAC, Doc 29: 4th Edition, Volume 2, 2016.
 where the loss is the quadratic difference between the estimated vertical profile and Calibrated Airspeed vs the ADS-B measured profile and Calibrated airspeed. 
-A key contribution of this work is the ability to robustly identifiy if an aircraft is climbing, accelerating, levelling or descending using noisy ADS-B data.
+Two key contributions of this work are:
+1. Robust identifation of aircraft *step type* (aircraft is climbing, accelerating, levelling or descending) solely from noisy ADS-B data.
+2. The NoiseCraft.py library, that allows to clean and segment ADS-B data and estimate relevant paramters using high-level functions like:
+    from modules import NoiseCraft
+    craft = NoiseCraft(equipment='A320-211')
+    craft.load_radar('radar.csv')
+    craft.load_meteo('meteo.csv')
+    craft.calculate_CAS()
+    craft.segment()
+    craft.recognize_steps()
+    craft.new_vert_profile()
 
 
 Algorithmic pipeline:
