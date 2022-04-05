@@ -15,3 +15,6 @@ Algorithmic pipeline:
 Some results:
 
 ![solution](https://user-images.githubusercontent.com/36279027/161814117-4ac1f07a-d449-4b3d-8fd3-6200073d502e.png)
+
+
+This work was presented on the 35th AIRMOD Noise Specialist meeting on October 21’
