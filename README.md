@@ -9,16 +9,16 @@ where the loss is the quadratic difference between the estimated vertical profil
 Two key contributions of this work are:
 1. Robust identifation of aircraft *step type* (aircraft is climbing, accelerating, levelling or descending) solely from noisy ADS-B data.
 2. The NoiseCraft.py library, that allows to clean and segment ADS-B data and estimate relevant paramters using high-level functions like:
-        ```python:
-        from modules import NoiseCraft
-        craft = NoiseCraft(equipment='A320-211')
-        craft.load_radar('radar.csv')
-        craft.load_meteo('meteo.csv')
-        craft.calculate_CAS()
-        craft.segment()
-        craft.recognize_steps()
-        craft.new_vert_profile()
-        ```
+```python
+from modules import NoiseCraft
+craft = NoiseCraft(equipment='A320-211')
+craft.load_radar('radar.csv')
+craft.load_meteo('meteo.csv')
+craft.calculate_CAS()
+craft.segment()
+craft.recognize_steps()
+craft.new_vert_profile()
+```
 
 
 Algorithmic pipeline:
